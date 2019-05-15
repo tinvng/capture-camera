@@ -4,11 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "cd client && npm start"
+    "client": "cd client && npm start",
+    "server": "cd server && go run server.go"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tinvng/capture-camera.git"
+    "url": "https://github.com/tinvng/capture-camera.git"
   },
   "author": "Tin VNG",
   "license": "ISC",
