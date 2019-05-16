@@ -1,142 +1,174 @@
-import React, { Component } from 'react';
-import { Container, Button, Image, Row } from 'react-bootstrap'
-import axios from 'axios';
+import React, { Component } from "react";
+import { Container, Button, Image, Row } from "react-bootstrap";
+import axios from "axios";
 
-const uid = "133135350005"
-const addr = "http://localhost:8080/profile/" + uid
+const uid = "david";
+const addr = "http://localhost:8080/profile/" + uid;
+
+const size = {
+	width: 500,
+	height: 375,
+}
 
 class App extends Component {
-    state = {
-        src: null,
-        selectedFile: null,
+  state = {
+    src: null,
+		selectedFile: null,
+		usingFileInput: false,
+		isCaptured: false,
+	};
+	
+	componentDidMount() {
+		if (navigator.getUserMedia){
+			navigator.getUserMedia({
+				video: {
+					...size,
+				},
+				audio: false,
+			}, stream => {
+				this.video.srcObject = stream;
+				this.video.play()
+			}, err => {
+				console.error(err);
+			})
+			console.log('true');
+		}
+		else {
+			console.log(false)
+		}
+	}
+
+  handleChangeInputFile = event => {
+    if (event.target.files && event.target.files[0]) {
+      this.setState({
+        selectedFile: event.target.files[0],
+        src: URL.createObjectURL(event.target.files[0])
+      });
     }
+	};
+	
+	onCapture = () => {
+		this.setState({ isCaptured: true })
 
-    handleChangeInputFile = event => {
-        if (event.target.files && event.target.files[0]) {
-            this.setState({
-                selectedFile: event.target.files[0],
-                src: URL.createObjectURL(event.target.files[0]),
-            })
-        }
-    }
+		console.log(this.video.videoWidth)
+		console.log(this.video.videoHeight)
 
-    onSubmit = () => {
-        if (this.state.selectedFile){
-            this.uploadHandler();
-        }
-    }
 
-    uploadHandler = () => {
-        const formData = new FormData()
+		this.canvas.getContext('2d').drawImage(this.video, 0, 0, size.width, size.height);
+	}
 
-        formData.append("uploadFile", this.state.selectedFile, this.state.selectedFile.name)
+  onSubmit = () => {
+    if (this.state.selectedFile) {
+      this.uploadHandler(this.state.selectedFile, this.state.selectedFile.FileName);
+		}
+		else if (this.state.isCaptured) {
+			this.canvas.toBlob(blob => {
+				if (blob) {
+					this.uploadHandler(blob, "captured picture");
+				}
+			}, "image/jpg")
+		}
+  };
 
-        axios.post(addr, formData)
-            .then(response => {
-                console.log(response);
-            })
-            .catch(err => {
-                console.log('error');
-            })
-    }
+  uploadHandler = (file, fileName) => {
+    const formData = new FormData();
 
-    uploadImage = function(src, type){
-        console.log('run uploadImage')
+    formData.append(
+      "uploadFile",
+      file,
+      fileName,
+    );
 
-        this.convertToBase64(src, type, function(data){
-            this.sendBase64ToServer( data);
-        });
-    };
+    axios
+      .post(addr, formData)
+      .then(response => {
+        console.log(response);
+      })
+      .catch(err => {
+        console.log("error");
+      });
+  };
 
-    convertToBase64 = function (url, imagetype, callback) {
-        console.log('run converToBase64')
+  render() {
+    return (
+      <Container>
+				{
+					this.state.usingFileInput
+					?
+					<div>
+						<input
+							className="mt-2"
+							type="file"
+							accept="image/*;capture=camera"
+							onChange={this.handleChangeInputFile}
+							/>
+		
+						<div>
+							{this.state.selectedFile ? (
+								<Row className="justify-content-center mt-2">
+									<Image
+										fluid
+										src={this.state.src}
+										alt=""
+										style={{
+											objectFit: "contain",
+											...size
+										}}
+									/>
+								</Row>
+							) : null}
+						</div>
+					</div>
+					:
+					<div>
+						<Row className="justify-content-center mt-2">
+							<video
+								ref={ref => this.video = ref}
+								style={{
+									margin: 0,
+									padding: 0,
+									...size,
+								}}
+							/>
+						</Row>
+						<Row className="mt-2 justify-content-center">
+							<Button variant="outline-success" onClick={this.onCapture} size="sm">
+								Capture
+							</Button>
+						</Row>
+					</div>
+				}
 
-        var img = document.createElement('IMG'),
-            canvas = document.createElement('CANVAS'),
-            ctx = canvas.getContext('2d'),
-            data = '';
+				{/* Image Display */}
+				<Row className='mt-2 justify-content-center'>
+					<canvas
+						ref={ref => this.canvas = ref}
+						width={size.width}
+						height={size.height}
+						style={{
+							display: this.state.isCaptured ? 'flex' : 'none',
+							objectFit: 'contain'
+						}}
+					/>
+				</Row>
 
-        // Set the crossOrigin property of the image element to 'Anonymous',
-        // allowing us to load images from other domains so long as that domain 
-        // has cross-origin headers properly set
-
-        img.crossOrigin = 'Anonymous'
-
-        // Because image loading is asynchronous, we define an event listening function that will be called when the image has been loaded
-        img.onLoad = function () {
-            // When the image is loaded, this function is called with the image object as its context or 'this' value
-            canvas.height = this.height;
-            canvas.width = this.width;
-            ctx.drawImage(this, 0, 0);
-            data = canvas.toDataURL(imagetype);
-            callback(data);
-        };
-
-        // We set the source of the image tag to start loading its data. We define 
-        // the event listener first, so that if the image has already been loaded 
-        // on the page or is cached the event listener will still fire
-
-        img.src = url;
-    };
-
-    sendBase64ToServer = function(base64){
-        console.log('run sendBase64ToSerVer')
-
-        const httpPost = new XMLHttpRequest();
-        const path = "http://localhost:8080/";
-        const data = JSON.stringify({image: base64});
-        
-        httpPost.onreadystatechange = function(err) {
-            if (httpPost.readyState === 4 && httpPost.status === 200){
-                console.log(httpPost.responseText);
-            } else {
-                console.log(err);
-            }
-        };
-
-        // Set the content type of the request to json since that's what's being sent
-        httpPost.setHeader('Content-Type', 'application/json');
-        httpPost.open("POST", path, true);
-        httpPost.send(data);
-    };
-
-    render() {
-        return (
-            <Container>
-                <input
-                    className="mt-2"
-                    type="file"
-                    accept="image/*;capture=camera"
-                    onChange={this.handleChangeInputFile}
-                />
-
-                {
-                    this.state.selectedFile
-                    ?
-                    <Row className="justify-content-center mt-2">
-                        <Image
-                            fluid
-                            src={this.state.src}
-                            alt=""
-                            style={{
-                                objectFit: "contain",
-                                width: 500,
-                                height: 300,
-                            }}
-                        />
-                    </Row>
-                    : null
-                }
-
-                <Row className="mt-2 justify-content-center">
-                    <Button
-                        variant="outline-info"
-                        onClick={this.onSubmit}
-                    >Send to server</Button>
-                </Row>
-            </Container>
-        );
-    }
+				{/* Send image to server */}
+				<Row className="my-2 justify-content-center"
+							style={{
+								display: this.state.isCaptured ? 'flex' : 'none',
+							}}
+						>
+							<Button
+								variant="outline-info"
+								onClick={this.onSubmit}
+								size="sm"
+							>
+								Send To Server
+							</Button>
+						</Row>
+      </Container>
+    );
+  }
 }
 
 export default App;
