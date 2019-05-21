@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -33,7 +34,7 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	uid := r.URL.Path[len("/profile/"):]
+	uid := r.URL.Path[len("/camera/upload/"):]
 
 	// valid file size
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
@@ -92,13 +93,45 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("User %s saved image %s successfully\n", uid, fileName+fileEndings[0])
 }
 
+func cameraHandler(w http.ResponseWriter, r *http.Request) {
+	// Get file
+	fileName := r.URL.Path[len("/camera/test/"):]
+	if len(fileName) == 0 {
+		http.Redirect(w, r, "/camera/test/index.html", http.StatusFound)
+	} else {
+		data, err := ioutil.ReadFile(fileName)
+		if err != nil {
+			w.WriteHeader(404)
+			return
+		}
+
+		var contentType string
+
+		if strings.HasSuffix(fileName, ".css") {
+			contentType = "text/css"
+		} else if strings.HasSuffix(fileName, ".html") {
+			contentType = "text/html"
+		} else if strings.HasSuffix(fileName, ".js") {
+			contentType = "application/javascript"
+		} else {
+			contentType = "text/plain"
+		}
+
+		w.Header().Add("Content-Type", contentType)
+		w.Write(data)
+
+		return
+	}
+}
+
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 }
 
 func main() {
-	http.HandleFunc("/", rootHandler)
-	http.HandleFunc("/profile/", profileHandler)
+	http.HandleFunc("/camera", rootHandler)
+	http.HandleFunc("/camera/upload/", profileHandler)
+	http.HandleFunc("/camera/test/", cameraHandler)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

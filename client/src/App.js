@@ -1,29 +1,19 @@
 import React, { Component } from "react";
-import { Container, Button, Image, Row } from "react-bootstrap";
-import axios from "axios";
+import { Container, Button, Row, Alert } from "react-bootstrap";
 
-const uid = "david";
-const addr = "http://localhost:8080/profile/" + uid;
-
-const size = {
-	width: 500,
-	height: 375,
-}
+import { VIDEO_SIZE } from "./utils/configs";
+import { uploadHandler } from "./utils/functions";
 
 class App extends Component {
   state = {
-    src: null,
-		selectedFile: null,
-		usingFileInput: false,
 		isCaptured: false,
+		showAlert: false,
 	};
 	
 	componentDidMount() {
 		if (navigator.getUserMedia){
 			navigator.getUserMedia({
-				video: {
-					...size,
-				},
+				video: { ...VIDEO_SIZE },
 				audio: false,
 			}, stream => {
 				this.video.srcObject = stream;
@@ -31,120 +21,83 @@ class App extends Component {
 			}, err => {
 				console.error(err);
 			})
-			console.log('true');
 		}
 		else {
-			console.log(false)
+			console.log(`User don't have media`);
 		}
 	}
-
-  handleChangeInputFile = event => {
-    if (event.target.files && event.target.files[0]) {
-      this.setState({
-        selectedFile: event.target.files[0],
-        src: URL.createObjectURL(event.target.files[0])
-      });
-    }
-	};
 	
 	onCapture = () => {
 		this.setState({ isCaptured: true })
 
-		console.log(this.video.videoWidth)
-		console.log(this.video.videoHeight)
-
-
-		this.canvas.getContext('2d').drawImage(this.video, 0, 0, size.width, size.height);
+		this.canvas.getContext('2d')
+			.drawImage(this.video, 0, 0, VIDEO_SIZE.width, VIDEO_SIZE.height);
 	}
 
   onSubmit = () => {
-    if (this.state.selectedFile) {
-      this.uploadHandler(this.state.selectedFile, this.state.selectedFile.FileName);
-		}
-		else if (this.state.isCaptured) {
+		if (this.state.isCaptured) {
 			this.canvas.toBlob(blob => {
 				if (blob) {
-					this.uploadHandler(blob, "captured picture");
+					uploadHandler(blob, "captured picture")
+						.then(response => {
+							if (response.status === 200) {
+								this.showAlert()
+
+								setTimeout(this.hideAlert, 3000)
+							}
+						})
+						.catch(err => {
+							console.error(err);
+						})
 				}
 			}, "image/jpg")
 		}
-  };
+	};
+	
+	showAlert = () => this.setState({ showAlert: true });
 
-  uploadHandler = (file, fileName) => {
-    const formData = new FormData();
-
-    formData.append(
-      "uploadFile",
-      file,
-      fileName,
-    );
-
-    axios
-      .post(addr, formData)
-      .then(response => {
-        console.log(response);
-      })
-      .catch(err => {
-        console.log("error");
-      });
-  };
+	hideAlert = () => this.setState({ showAlert: false });
 
   render() {
     return (
       <Container>
-				{
-					this.state.usingFileInput
-					?
-					<div>
-						<input
-							className="mt-2"
-							type="file"
-							accept="image/*;capture=camera"
-							onChange={this.handleChangeInputFile}
-							/>
-		
-						<div>
-							{this.state.selectedFile ? (
-								<Row className="justify-content-center mt-2">
-									<Image
-										fluid
-										src={this.state.src}
-										alt=""
-										style={{
-											objectFit: "contain",
-											...size
-										}}
-									/>
-								</Row>
-							) : null}
-						</div>
-					</div>
-					:
-					<div>
-						<Row className="justify-content-center mt-2">
-							<video
-								ref={ref => this.video = ref}
-								style={{
-									margin: 0,
-									padding: 0,
-									...size,
-								}}
-							/>
-						</Row>
-						<Row className="mt-2 justify-content-center">
-							<Button variant="outline-success" onClick={this.onCapture} size="sm">
-								Capture
-							</Button>
-						</Row>
-					</div>
-				}
+				{/* Alert Success Upload */}
+				<Row className="justify-content-center mt-1">
+					<Alert
+						variant='success'
+						show={this.state.showAlert}
+						style={{ position: 'fixed', cursor: 'pointer' }}
+						onClick={this.hideAlert}
+					>Upload Successfully</Alert>
+				</Row>
 
-				{/* Image Display */}
+				{/* Video */}
+				<Row className="justify-content-center mt-2">
+					<video
+						ref={ref => this.video = ref}
+						style={{
+							margin: 0,
+							padding: 0,
+							...VIDEO_SIZE,
+						}}
+					/>
+				</Row>
+
+				{/* Capture Button */}
+				<Row className="mt-2 justify-content-center">
+					<Button
+						variant="outline-success"
+						size="sm"
+						onClick={this.onCapture}
+					>Capture</Button>
+				</Row>
+
+				{/* Image Display with Canvas tag */}
 				<Row className='mt-2 justify-content-center'>
 					<canvas
 						ref={ref => this.canvas = ref}
-						width={size.width}
-						height={size.height}
+						width={VIDEO_SIZE.width}
+						height={VIDEO_SIZE.height}
 						style={{
 							display: this.state.isCaptured ? 'flex' : 'none',
 							objectFit: 'contain'
@@ -152,20 +105,19 @@ class App extends Component {
 					/>
 				</Row>
 
-				{/* Send image to server */}
-				<Row className="my-2 justify-content-center"
-							style={{
-								display: this.state.isCaptured ? 'flex' : 'none',
-							}}
-						>
-							<Button
-								variant="outline-info"
-								onClick={this.onSubmit}
-								size="sm"
-							>
-								Send To Server
-							</Button>
-						</Row>
+				{/* Button Send Image to server */}
+				<Row
+					className="my-2 justify-content-center"
+					style={{
+						display: this.state.isCaptured ? 'flex' : 'none',
+					}}
+				>
+					<Button
+						variant="outline-info"
+						size="sm"
+						onClick={this.onSubmit}
+					>Send To Server</Button>
+				</Row>
       </Container>
     );
   }
